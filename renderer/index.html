@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>FIM Agent</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f5f6fa;
+      color: #333;
+      margin: 0;
+      padding: 20px;
+    }
+    h1 {
+      color: #0078d7;
+    }
+    .card {
+      background: white;
+      padding: 15px;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+    button {
+      padding: 8px 12px;
+      margin-top: 5px;
+      cursor: pointer;
+    }
+    pre {
+      background: #f0f0f0;
+      padding: 10px;
+      border-radius: 5px;
+      max-height: 360px;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>File Integrity Monitoring Agent</h1>
+
+  <!-- Status -->
+  <div class="card">
+    <p><b>Status:</b> Running ✅</p>
+    <p><b>Watch Path:</b> C:\test-folder</p>
+    <p><b>Scan Interval:</b> 10 minutes</p>
+  </div>
+
+  <!-- Activity Logs -->
+  <div class="card">
+    <h3>Activity Logs</h3>
+    <pre id="logs">(no events yet)</pre>
+  </div>
+
+  <!-- File Upload -->
+  <!-- <div class="card">
+    <h3>Manual File Upload</h3>
+    <button id="selectFileBtn">Select File</button>
+    <button id="uploadBtn">Upload</button>
+    <pre id="uploadLog"></pre>
+  </div> -->
+
+  <!-- Show Saved Events -->
+  <div class="card">
+    <button id="historyBtn">Show Saved Events</button>
+  </div>
+
+  <script>
+    const { ipcRenderer } = require('electron');
+
+    const logs = document.getElementById('logs');
+    const uploadLog = document.getElementById('uploadLog');
+    let selectedFilePath = null;
+
+    // --- Watcher logs from main process
+    ipcRenderer.on('log', (event, message) => {
+      logs.textContent += '\n' + message;
+    });
+
+    // --- File selection
+    const selectFileBtn = document.getElementById('selectFileBtn');
+    selectFileBtn.onclick = async () => {
+      const paths = await ipcRenderer.invoke('select-file');
+      if (!paths || paths.length === 0) return alert('No file selected');
+      selectedFilePath = paths[0];
+      uploadLog.textContent = `Selected file: ${selectedFilePath}`;
+    };
+
+    // --- File upload
+    const uploadBtn = document.getElementById('uploadBtn');
+    uploadBtn.onclick = async () => {
+      if (!selectedFilePath) return alert('Select a file first!');
+      const result = await ipcRenderer.invoke('upload-file', selectedFilePath);
+      uploadLog.textContent = result.message || result.error;
+    };
+
+    // --- Show saved events from SQLite
+    const historyBtn = document.getElementById('historyBtn');
+    historyBtn.onclick = async () => {
+      const events = await ipcRenderer.invoke('get-events');
+      logs.textContent = events.map(e =>
+        `[${e.timestamp}] ${e.event_type.toUpperCase()} - ${e.file_path}`
+      ).join('\n') || 'No saved events.';
+    };
+  </script>
+
+  <div class="card">
+  <p><b>Agent ID:</b> <span id="agentId">Not registered</span></p>
+</div>
+
+<script>
+  <!-- const { ipcRenderer } = require('electron'); -->
+
+  async function loadAgentId() {
+    const agentId = await ipcRenderer.invoke('get-agent-id');
+    document.getElementById('agentId').textContent = agentId || 'Not registered';
+  }
+
+  loadAgentId();
+</script>
+
+</body>
+</html>
